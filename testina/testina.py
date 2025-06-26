@@ -17,12 +17,7 @@ def main():
     rand_num = random.randint(1, 100)
     print(f"Numero casuale da 1 a 100: {rand_num}")
 
-    # Facciamo una richiesta http semplice a example.com
-    try:
-        r = requests.get("https://example.com")
-        print(f"Richiesta a example.com status code: {r.status_code}")
-    except Exception as e:
-        print(f"Errore nella richiesta HTTP: {e}")
+  
 
 if __name__ == "__main__":
     main()
