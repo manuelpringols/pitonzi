@@ -2,8 +2,8 @@
 
 import sys
 import socket
+import os
 from impacket.smbconnection import SMBConnection
-from netaddr import IPNetwork
 from impacket import smb
 
 class Colors:
@@ -11,7 +11,6 @@ class Colors:
     RED = '\033[91m'
     BRIGHT_RED = '\033[91;1m'
     YELLOW = '\033[93m'
-    BLUE = '\033[94m'
     RESET = '\033[0m'
 
 def print_status(ip, message, color):
@@ -47,44 +46,40 @@ def deep_eternalblue_probe(ip):
 
         fid = conn.openFile(tid, "srvsvc", smb.SMB_O_RDONLY)
         conn.close()
-        return False  # Se tutto fila liscio, non vulnerabile
+        return False
     except Exception as e:
         if "STATUS_INSUFF_SERVER_RESOURCES" in str(e):
-            return True  # Pattern classico di MS17-010
+            return True
         return False
 
 def check_eternalblue_full(ip):
     if not check_port_445(ip):
         print_status(ip, "Porta 445 CHIUSA o NON raggiungibile", Colors.YELLOW)
-        return 'PORT_CLOSED'
+        return
 
     if not check_smbv1(ip):
         print_status(ip, "Sistema NON vulnerabile: SMBv1 NON attivo", Colors.GREEN)
-        return 'NOT_VULNERABLE'
+        return
 
-    # SMBv1 attivo — potenzialmente vulnerabile
     if deep_eternalblue_probe(ip):
         print_status(ip, "⚠️ VULNERABILITÀ CRITICA: EternalBlue BREACH POSSIBILE – PATCH IMMEDIATA!", Colors.BRIGHT_RED)
-        return 'CRITICALLY_VULNERABLE'
     else:
         print_status(ip, "SMBv1 attivo: POTENZIALMENTE vulnerabile, MA NO SEGNI di breach immediato", Colors.RED)
-        return 'POTENTIALLY_VULNERABLE'
-
-def expand_targets(arg):
-    try:
-        return list(IPNetwork(arg))
-    except:
-        return [arg]
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print(f"Uso: {sys.argv[0]} <IP|subnet>")
-        print("Esempio:")
-        print(f"  {sys.argv[0]} 192.168.1.10")
-        print(f"  {sys.argv[0]} 192.168.1.0/24")
+        print(f"Uso: {sys.argv[0]} <IP o file.txt>")
         sys.exit(1)
 
-    targets = expand_targets(sys.argv[1])
-    for ip in targets:
-        check_eternalblue_full(str(ip))
+    input_arg = sys.argv[1]
 
+    # Se è un file, leggi ogni IP da file
+    if os.path.isfile(input_arg):
+        with open(input_arg, 'r') as f:
+            for line in f:
+                ip = line.strip()
+                if ip:
+                    check_eternalblue_full(ip)
+    else:
+        # Altrimenti tratta l'argomento come singolo IP
+        check_eternalblue_full(input_arg)
