@@ -1,5 +1,7 @@
 import sys
 import os
+import subprocess
+import platform
 from PIL import Image
 import pytesseract
 from colorama import Fore, Style, init
@@ -15,10 +17,17 @@ def print_error(msg):
 
 def print_success(msg):
     print(Fore.GREEN + msg + Style.RESET_ALL)
-    
-    
-    def install_tesseract():
-        """Prova a installare tesseract in base al SO rilevato"""
+
+def is_tesseract_installed():
+    """Controlla se tesseract è installato nel sistema."""
+    try:
+        subprocess.run(['tesseract', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+def install_tesseract():
+    """Prova a installare tesseract in base al SO rilevato."""
     system = platform.system()
     print_info(f"Sistema operativo rilevato: {system}")
 
@@ -32,9 +41,8 @@ def print_success(msg):
                 cmd = ['sudo', 'pacman', '-S', '--noconfirm', 'tesseract', 'tesseract-data-eng', 'tesseract-data-ita']
             elif any(x in info for x in ['debian', 'ubuntu', 'mint']):
                 pm = 'apt'
-                cmd = ['sudo', 'apt', 'update']
                 print_info("Aggiornamento repository con apt...")
-                subprocess.run(cmd, check=True)
+                subprocess.run(['sudo', 'apt', 'update'], check=True)
                 cmd = ['sudo', 'apt', 'install', '-y', 'tesseract-ocr', 'tesseract-ocr-eng', 'tesseract-ocr-ita']
             else:
                 print_error("Distro Linux non riconosciuta automaticamente per installazione automatica.")
@@ -48,17 +56,14 @@ def print_success(msg):
         cmd = ['brew', 'install', 'tesseract']
 
     elif system == "Windows":
-        # Windows non ha un package manager sempre presente, usiamo scoop o chocolatey se ci sono
-        # altrimenti invitiamo a installare manualmente
-        # Proviamo scoop
+        # Windows: proviamo scoop o chocolatey
         try:
-            subprocess.run(['scoop', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(['scoop', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
             pm = 'scoop'
             cmd = ['scoop', 'install', 'tesseract']
         except Exception:
-            # Proviamo chocolatey
             try:
-                subprocess.run(['choco', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(['choco', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
                 pm = 'choco'
                 cmd = ['choco', 'install', 'tesseract', '-y']
             except Exception:
@@ -104,6 +109,15 @@ def select_file_interactive():
     return choice
 
 def main():
+    # Controllo tesseract come primissima cosa
+    if not is_tesseract_installed():
+        print_error("Tesseract non è installato sul sistema.")
+        if not install_tesseract():
+            print_error("Impossibile procedere senza tesseract. Esco.")
+            sys.exit(1)
+        else:
+            sys.exit(0)  # Esci dopo installazione, utente deve rilanciare lo script
+
     if len(sys.argv) > 1:
         image_path = sys.argv[1]
         if not os.path.isfile(image_path):
