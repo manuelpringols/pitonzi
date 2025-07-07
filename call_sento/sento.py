@@ -1,76 +1,33 @@
-import sounddevice as sd
-import numpy as np
-import webrtcvad
-import whisper
-import collections
 import sys
-import os
-import tempfile
-import scipy.io.wavfile
+import queue
+import sounddevice as sd
+from vosk import Model, KaldiRecognizer
 
-# Initialize whisper
-model = whisper.load_model("base")
+model = Model("model")  # scarica il modello vosk adatto (es. small o base)
+rec = KaldiRecognizer(model, 16000)
+q = queue.Queue()
 
-# Initialize VAD
-vad = webrtcvad.Vad(1)  # Aggressiveness: 0-3
+def audio_callback(indata, frames, time, status):
+    q.put(bytes(indata))
 
-samplerate = 16000
-frame_duration = 30  # ms
-frame_size = int(samplerate * frame_duration / 1000)
-
-def record_until_silence(max_silence_ms=1000):
-    print("🎙️ Start talking...")
-    audio_buffer = []
-    silence_buffer = 0
-
-    stream = sd.InputStream(channels=1, samplerate=samplerate, dtype='int16')
-    stream.start()
-
-    try:
-        while True:
-            data, _ = stream.read(frame_size)
-            frame = data.flatten().tobytes()
-            is_speech = vad.is_speech(frame, samplerate)
-
-            audio_buffer.append(data)
-
-            if is_speech:
-                silence_buffer = 0
+with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
+                       channels=1, callback=audio_callback):
+    print("Parla e vedrai il testo trascritto in tempo reale. Di' 'enter' per eseguire.")
+    buffer = ""
+    while True:
+        data = q.get()
+        if rec.AcceptWaveform(data):
+            result = rec.Result()
+            text = eval(result)['text']
+            print(f"\r{text}", end="")
+            if "enter" in text or "esegui" in text:
+                print(f"\nEseguo comando: {buffer}")
+                import os
+                os.system(buffer)
+                buffer = ""
             else:
-                silence_buffer += frame_duration
-
-            if silence_buffer > max_silence_ms:
-                break
-
-    finally:
-        stream.stop()
-
-    # Concatenate all frames
-    audio_np = np.concatenate(audio_buffer, axis=0)
-    return audio_np
-
-def save_wav(audio, filename):
-    scipy.io.wavfile.write(filename, samplerate, audio)
-
-buffer = ""
-
-while True:
-    audio = record_until_silence(max_silence_ms=800)  # stop after 0.8s of silence
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        save_wav(audio, f.name)
-        result = model.transcribe(f.name, language='it')
-        text = result["text"].lower().strip()
-        os.unlink(f.name)
-
-    print(f"🗣️ Heard: {text}")
-
-    if "enter" in text or "esegui" in text:
-        if buffer.strip():
-            print(f"🚀 Executing: {buffer.strip()}")
-            subprocess.run(buffer.strip(), shell=True)
-            buffer = ""
+                buffer += " " + text
         else:
-            print("⚠️ No command to execute.")
-    else:
-        buffer += " " + text
-        print(f"💬 Current buffer: {buffer.strip()}")
+            partial = rec.PartialResult()
+            partial_text = eval(partial)['partial']
+            print(f"\r{buffer} {partial_text}", end="")
