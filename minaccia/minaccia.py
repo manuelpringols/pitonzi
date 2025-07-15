@@ -1,4 +1,5 @@
 import nmap
+import ssl
 import ipaddress
 import requests
 import subprocess
@@ -13,7 +14,7 @@ import platform
 import sys
 from rich import print
 from rich.prompt import Prompt
-
+from datetime import datetime
 init(autoreset=True)
 
 # --- CONFIG ---
@@ -111,7 +112,17 @@ def check_nmap():
         print("[bold green]✅ Nmap è già installato.[/bold green]")
 
 
-
+def check_dependency(command_name, package_name=None, is_python_package=False):
+    if subprocess.run(["which", command_name], capture_output=True).returncode != 0:
+        print(f"[bold red]⚠️ {command_name} non risulta installato sul sistema.[/bold red]")
+        risposta = Prompt.ask(f"[bold yellow]Vuoi installare {package_name or command_name} ora?[/bold yellow] (S/n)", default="S")
+        if risposta.lower() in ["s", "si", "y", "yes"]:
+            install_package(package_name or command_name, is_python_package=is_python_package)
+        else:
+            print(f"[bold red]{command_name} è necessario per continuare. Uscita...[/bold red]")
+            sys.exit(0)
+    else:
+        print(f"[bold green]✅ {command_name} è già installato.[/bold green]")
 
 
 
@@ -251,6 +262,153 @@ def controllo_http_headers(host: str, port: int, svc: Dict[str, Any]) -> List[st
             issues.append(f"HTTP header check failed: {e}")
     return issues
 
+def controllo_ssl_expiry(host: str, port: int, svc: Dict[str, Any]) -> List[str]:
+    issues = []
+    if svc.get("name") == "https":
+        context = ssl.create_default_context()
+        try:
+            with socket.create_connection((host, port), timeout=5) as sock:
+                with context.wrap_socket(sock, server_hostname=host) as ssock:
+                    cert = ssock.getpeercert()
+                    if cert:
+                        expires = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
+                        days_left = (expires - datetime.utcnow()).days
+                        if days_left < 30:
+                            issues.append(f"SSL certificate expiring soon ({days_left} days left)")
+        except Exception as e:
+            issues.append(f"SSL expiry check failed: {e}")
+    return issues
+
+def controllo_common_admin_paths(host: str, port: int, svc: Dict[str, Any]) -> List[str]:
+    issues = []
+    if svc.get("name") in ["http", "https"]:
+        protocol = "https" if svc.get("name") == "https" else "http"
+        urls = ["/admin", "/login", "/test", "/phpmyadmin"]
+        for path in urls:
+            try:
+                url = f"{protocol}://{host}:{port}{path}"
+                r = requests.get(url, timeout=3)
+                if r.status_code < 400:
+                    issues.append(f"Accessible common path: {path} (status {r.status_code})")
+            except:
+                pass
+    return issues
+
+def controllo_reverse_dns(host: str, port: int, svc: Dict[str, Any]) -> List[str]:
+    issues = []
+    try:
+        rev = socket.gethostbyaddr(host)
+        issues.append(f"Reverse DNS: {rev[0]}")
+    except:
+        issues.append("No reverse DNS configured")
+    return issues
+
+def controllo_ssh_protocol_v1(host: str, port: int, svc: dict) -> list:
+    issues = []
+    if svc.get("name") == "ssh":
+        try:
+            # Il banner SSH contiene la versione del protocollo
+            with socket.create_connection((host, port), timeout=5) as sock:
+                banner = sock.recv(1024).decode('utf-8', errors='ignore')
+                if "SSH-1." in banner:
+                    issues.append("SSH protocol v1 detected - vulnerable and deprecated")
+        except Exception as e:
+            issues.append(f"SSH protocol check failed: {e}")
+    return issues
+
+from ftplib import FTP, error_perm
+
+def controllo_ftp_anonymous_upload(host: str, port: int, svc: dict) -> list:
+    issues = []
+    if svc.get("name") == "ftp":
+        try:
+            ftp = FTP()
+            ftp.connect(host, port, timeout=5)
+            ftp.login()  # anonymous login
+            try:
+                # Provo a scrivere un file di prova in /tmp o root
+                test_file = "test_upload.txt"
+                ftp.storbinary(f"STOR {test_file}", open("/dev/null", "rb"))
+                issues.append("FTP anonymous upload allowed - critical vulnerability")
+            except error_perm:
+                pass  # upload non permesso, bene
+            ftp.quit()
+        except Exception as e:
+            issues.append(f"FTP check failed: {e}")
+    return issues
+
+def controllo_http_directory_traversal(host: str, port: int, svc: dict) -> list:
+    issues = []
+    if svc.get("name") in ["http", "https"]:
+        protocol = "https" if svc.get("name") == "https" else "http"
+        try:
+            url = f"{protocol}://{host}:{port}/../../../../../../../../etc/passwd"
+            r = requests.get(url, timeout=5, verify=False)
+            if r.status_code == 200 and "root:" in r.text:
+                issues.append("Directory Traversal vulnerability detected - /etc/passwd accessible")
+        except Exception as e:
+            issues.append(f"HTTP Directory Traversal check failed: {e}")
+    return issues
+
+def controllo_redis_open(host: str, port: int, svc: dict) -> list:
+    issues = []
+    if svc.get("name") == "redis":
+        try:
+            s = socket.socket()
+            s.settimeout(3)
+            s.connect((host, port))
+            s.send(b"PING\r\n")
+            res = s.recv(1024)
+            if b"+PONG" in res:
+                issues.append("Redis server without authentication - critical risk")
+            s.close()
+        except Exception as e:
+            issues.append(f"Redis check failed: {e}")
+    return issues
+
+import mysql.connector
+from mysql.connector import errors
+
+def controllo_mysql_default_creds(host: str, port: int, svc: dict) -> list:
+    issues = []
+    if svc.get("name") == "mysql":
+        try:
+            conn = mysql.connector.connect(
+                host=host,
+                port=port,
+                user="root",
+                password="root",
+                connection_timeout=5,
+            )
+            if conn.is_connected():
+                issues.append("MySQL default credentials root:root valid - critical")
+                conn.close()
+        except errors.InterfaceError:
+            pass  # non connesso
+        except errors.ProgrammingError:
+            pass  # credenziali errate
+        except Exception as e:
+            issues.append(f"MySQL check error: {e}")
+    return issues
+
+def controllo_smbv1(host: str, port: int, svc: dict) -> list:
+    issues = []
+    if svc.get("name") == "microsoft-ds" or port == 445:
+        try:
+            s = socket.socket()
+            s.settimeout(3)
+            s.connect((host, port))
+            # Pacchetto semplice per query SMB protocol v1
+            s.send(b"\x00\x00\x00\x90\xff\x53\x4d\x42\x72\x00\x00\x00\x00\x18\x53\xc8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+            res = s.recv(1024)
+            if b"SMB" in res and res[4] == 0x72:
+                # Versione SMB 1.0
+                issues.append("SMB v1 protocol detected - vulnerable to multiple exploits")
+            s.close()
+        except Exception as e:
+            issues.append(f"SMBv1 check failed: {e}")
+    return issues
+
 def controllo_porta_sospetta(host: str, port: int, svc: Dict[str, Any]) -> List[str]:
     suspicious_ports = [21, 23, 69, 2323]  # ftp, telnet, tftp, etc.
     issues = []
@@ -320,6 +478,15 @@ controlli = [
     controllo_default_credenziali,
     controllo_tls_weak_ciphers,
     controllo_ftp_anonymous,
+    controllo_ssh_protocol_v1,
+    controllo_ftp_anonymous_upload,
+    controllo_http_directory_traversal,
+    controllo_smbv1,
+    controllo_mysql_default_creds,
+    controllo_redis_open,
+    controllo_ssl_expiry,
+    controllo_common_admin_paths,
+    controllo_reverse_dns,
 ]
 
 # --- Report e stampa ---
@@ -357,19 +524,43 @@ def print_report(scan_result: Dict[str, Any]):
 def export_report_to_pdf(scan_results: List[Dict[str, Any]], filename: str = "scan_report.pdf"):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "Network Scan Report", 0, 1, 'C')
-    pdf.set_font("Arial", '', 12)
 
+    # --- Cover page ---
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 20)
+    pdf.cell(0, 10, "Network Scan Report", 0, 1, 'C')
+    pdf.set_font("Arial", '', 14)
+    pdf.cell(0, 10, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 0, 1, 'C')
+    pdf.ln(10)
+
+    # --- Summary ---
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "Summary", 0, 1)
+    pdf.set_font("Arial", '', 12)
     for scan_result in scan_results:
         host = scan_result.get("host", "Unknown")
         services = scan_result.get("services", [])
-        pdf.set_text_color(0, 0, 128)
+        total_issues = 0
+        for svc in services:
+            for controllo in controlli:
+                issues = controllo(host, svc.get("port"), svc)
+                total_issues += len(issues)
+        pdf.cell(0, 8, f"{host}: {total_issues} issues found", 0, 1)
+    pdf.add_page()
+
+    # --- Detailed report per host ---
+    for scan_result in scan_results:
+        host = scan_result.get("host", "Unknown")
+        services = scan_result.get("services", [])
+
+        pdf.set_font("Arial", 'B', 16)
         pdf.cell(0, 10, f"Host: {host}", 0, 1)
+        pdf.set_font("Arial", '', 12)
+
         if not services:
             pdf.set_text_color(128, 0, 0)
             pdf.cell(0, 10, "No services found or host down.", 0, 1)
+            pdf.set_text_color(0, 0, 0)
         else:
             for svc in services:
                 port = svc.get("port")
@@ -377,7 +568,6 @@ def export_report_to_pdf(scan_results: List[Dict[str, Any]], filename: str = "sc
                 state = svc.get("state")
                 product = svc.get("product")
                 version = svc.get("version")
-                pdf.set_text_color(0, 0, 0)
                 pdf.cell(0, 8, f"Port: {port} / Service: {name} / State: {state}", 0, 1)
                 pdf.cell(0, 8, f"Product: {product} / Version: {version}", 0, 1)
                 all_issues = []
@@ -392,16 +582,36 @@ def export_report_to_pdf(scan_results: List[Dict[str, Any]], filename: str = "sc
                     pdf.cell(0, 8, "[!] Issues found:", 0, 1)
                     for issue in all_issues:
                         pdf.multi_cell(0, 7, f" - {issue}")
+                    pdf.set_text_color(0, 0, 0)
                 else:
                     pdf.set_text_color(0, 128, 0)
                     pdf.cell(0, 8, "No issues found on this service.", 0, 1)
-                pdf.ln(4)  # spazio extra
+                    pdf.set_text_color(0, 0, 0)
+                pdf.ln(3)
+        pdf.add_page()
 
     pdf.output(filename)
     print(Fore.GREEN + f"[+] Report exported to PDF: {filename}" + Style.RESET_ALL)
 
 
 def main():
+     # Controlla pacman e installa mysql client (mariadb-libs)
+    check_dependency("mysql", "mariadb-libs")
+
+    # Controlla modulo python mysql-connector-python
+    try:
+        import mysql.connector
+        print("[bold green]✅ mysql-connector-python è già installato.[/bold green]")
+    except ImportError:
+        risposta = Prompt.ask("[bold yellow]Vuoi installare mysql-connector-python (modulo Python) ora?[/bold yellow] (S/n)", default="S")
+        if risposta.lower() in ["s", "si", "y", "yes"]:
+            install_package("mysql-connector-python", is_python_package=True)
+        else:
+            print("[bold red]mysql-connector-python è necessario per continuare. Uscita...[/bold red]")
+            sys.exit(0)
+
+
+            
     parser = argparse.ArgumentParser(description="Advanced Network Scanner & Vulnerability Checker")
     parser.add_argument('-l', '--list', nargs='+', help="List of IP addresses or hostnames to scan directly")
     parser.add_argument('-f', '--file', help="File containing list of IP addresses or hostnames to scan")
