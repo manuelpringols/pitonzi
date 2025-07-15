@@ -9,6 +9,10 @@ from colorama import Fore, Style, init
 import argparse
 import sys
 from fpdf import FPDF
+import platform
+import sys
+from rich import print
+from rich.prompt import Prompt
 
 init(autoreset=True)
 
@@ -16,6 +20,100 @@ init(autoreset=True)
 API_KEY = "OZ26D1CUUXT4QV75BKYKM77CNK3CWYFKCKLFBASAZDHIDKM86Y64L2GDLBPRUDMZ"
 DEFAULT_SUBNET = "192.168.1.0/24"
 PORT_RANGE = "1-1024"
+
+
+
+
+
+
+
+
+
+
+
+
+
+def get_package_manager():
+    os_name = platform.system()
+
+    if os_name == "Linux":
+        try:
+            with open("/etc/os-release") as f:
+                os_release = f.read().lower()
+        except FileNotFoundError:
+            os_release = ""
+
+        if "ubuntu" in os_release or "debian" in os_release:
+            return os_name, "debian/ubuntu", "apt"
+        elif "fedora" in os_release or "red hat" in os_release or "centos" in os_release:
+            return os_name, "fedora/centos/rhel", "dnf"
+        elif "arch" in os_release:
+            return os_name, "arch", "pacman"
+        elif "opensuse" in os_release:
+            return os_name, "opensuse", "zypper"
+        else:
+            for pm in ["apt", "dnf", "yum", "pacman", "zypper"]:
+                if subprocess.run(["which", pm], capture_output=True).returncode == 0:
+                    return os_name, "linux-unknown", pm
+            return os_name, "linux-unknown", None
+
+    elif os_name == "Darwin":
+        return os_name, "macos", "brew"
+    elif os_name == "Windows":
+        for pm in ["winget", "choco"]:
+            if subprocess.run(["where", pm], capture_output=True, shell=True).returncode == 0:
+                return os_name, "windows", pm
+        return os_name, "windows", None
+    else:
+        return os_name, None, None
+
+
+def install_package(package_name):
+    os_name, distro, pm = get_package_manager()
+
+    if pm is None:
+        raise EnvironmentError(f"Package manager non trovato per sistema {os_name} / {distro}")
+
+    if pm == "apt":
+        subprocess.run(["sudo", "apt", "update"], check=True)
+        cmd = ["sudo", "apt", "install", "-y", package_name]
+    elif pm == "dnf":
+        cmd = ["sudo", "dnf", "install", "-y", package_name]
+    elif pm == "yum":
+        cmd = ["sudo", "yum", "install", "-y", package_name]
+    elif pm == "pacman":
+        cmd = ["sudo", "pacman", "-Sy", package_name]
+    elif pm == "zypper":
+        cmd = ["sudo", "zypper", "install", "-y", package_name]
+    elif pm == "brew":
+        cmd = ["brew", "install", package_name]
+    elif pm == "winget":
+        cmd = ["winget", "install", "--id", package_name]
+    elif pm == "choco":
+        cmd = ["choco", "install", package_name, "-y"]
+    else:
+        raise EnvironmentError(f"Package manager {pm} non supportato")
+
+    print(f"[bold green]Eseguo il comando:[/bold green] {' '.join(cmd)}")
+    subprocess.run(cmd, check=True)
+
+
+def check_nmap():
+    if subprocess.run(["which", "nmap"], capture_output=True).returncode != 0:
+        print("[bold red]⚠️ Nmap non risulta installato sul sistema.[/bold red]")
+        risposta = Prompt.ask("[bold yellow]Vuoi installarlo ora?[/bold yellow] (S/n)", default="S")
+        if risposta.lower() in ["s", "si", "y", "yes"]:
+            install_package("nmap")
+        else:
+            print("[bold red]Nmap è necessario per continuare. Uscita...[/bold red]")
+            sys.exit(0)
+    else:
+        print("[bold green]✅ Nmap è già installato.[/bold green]")
+
+
+
+
+
 
 # --- Funzione classificazione severità ---
 def classify_severity(score: float) -> str:
@@ -350,4 +448,6 @@ def main():
         export_report_to_pdf(scan_results)
 
 if __name__ == "__main__":
+    print(get_package_manager())
+    check_nmap()
     main()
