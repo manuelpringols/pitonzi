@@ -1,3 +1,4 @@
+import nmap
 import ipaddress
 import requests
 import subprocess
