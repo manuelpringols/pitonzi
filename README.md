@@ -54,27 +54,28 @@
 
 ---
 
-## 📁 Project Structure
+
+## 🟡 Project Structure - pitonzi
 
 ```sh
 └── pitonzi/
-    ├── README.md
-    ├── check_eb_stealth
-    │   └── check_eb_stealth.py
-    ├── check_system_v2
-    │   └── check_system_v2.py
-    ├── find_file
-    │   └── find_file.py
-    ├── minaccia
-    │   ├── lista
-    │   ├── minaccia.py
-    │   └── scan_report.pdf
-    ├── ocr_interactive
-    │   └── ocr_interactive.py
-    └── testina
-        └── testina.py
-```
+    ├── README.md                    # Documentazione del progetto pitonzi
+    ├── check_eb_stealth/
+    │   └── check_eb_stealth.py     # Script Python per il controllo stealth di EB (presumibilmente qualche verifica di sicurezza)
+    ├── check_system_v2/
+    │   └── check_system_v2.py       # Script Python versione 2 per il controllo del sistema
+    ├── find_file/
+    │   └── find_file.py             # Script Python per la ricerca di file
+    ├── minaccia/
+    │   ├── lista/                   # Cartella probabilmente contenente liste per minacce o dati
+    │   ├── minaccia.py              # Script Python per la gestione o l'analisi delle minacce
+    │   └── scan_report.pdf          # Report PDF generato dallo script di scansione minacce
+    ├── ocr_interactive/
+    │   └── ocr_interactive.py       # Script Python per un OCR con interazione utente
+    └── testina/
+        └── testina.py               # Script Python, nome generico, probabile componente specifica del progetto
 
+```
 ### 📑 Project Index
 
 <details open>
