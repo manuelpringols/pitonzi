@@ -7,33 +7,33 @@
 <em></em>
 
 <!-- BADGES -->
-<img src="https://img.shields.io/github/license/manuelpringols/pitonzi?style=flat-square&logo=opensourceinitiative&logoColor=white&color=E92063" alt="license">
-<img src="https://img.shields.io/github/last-commit/manuelpringols/pitonzi?style=flat-square&logo=git&logoColor=white&color=E92063" alt="last-commit">
-<img src="https://img.shields.io/github/languages/top/manuelpringols/pitonzi?style=flat-square&color=E92063" alt="repo-top-language">
-<img src="https://img.shields.io/github/languages/count/manuelpringols/pitonzi?style=flat-square&color=E92063" alt="repo-language-count">
+<img src="https://img.shields.io/github/license/manuelpringols/pitonzi?style=flat&logo=opensourceinitiative&logoColor=white&color=0099FF" alt="license">
+<img src="https://img.shields.io/github/last-commit/manuelpringols/pitonzi?style=flat&logo=git&logoColor=white&color=0099FF" alt="last-commit">
+<img src="https://img.shields.io/github/languages/top/manuelpringols/pitonzi?style=flat&color=0099FF" alt="repo-top-language">
+<img src="https://img.shields.io/github/languages/count/manuelpringols/pitonzi?style=flat&color=0099FF" alt="repo-language-count">
 
 <em>Built with the tools and technologies:</em>
 
-<img src="https://img.shields.io/badge/Python-3776AB.svg?style=flat-square&logo=Python&logoColor=white" alt="Python">
+<img src="https://img.shields.io/badge/Python-3776AB.svg?style=flat&logo=Python&logoColor=white" alt="Python">
 
 <br clear="left"/>
 
-## 🌈 Table of Contents
+## 📄 Table of Contents
 
 <details>
 <summary>Table of Contents</summary>
 
-- [🌈 Table of Contents](#-table-of-contents)
-- [🔴 Overview](#-overview)
-- [🟠 Features](#-features)
-- [🟡 Project Structure](#-project-structure)
-    - [🟢 Project Index](#-project-index)
-- [🔵 Getting Started](#-getting-started)
-    - [🟣 Prerequisites](#-prerequisites)
-    - [⚫ Installation](#-installation)
-    - [⚪ Usage](#-usage)
-    - [🟤 Testing](#-testing)
-- [🌟 Roadmap](#-roadmap)
+- [📄 Table of Contents](#-table-of-contents)
+- [✨ Overview](#-overview)
+- [📌 Features](#-features)
+- [📁 Project Structure](#-project-structure)
+    - [📑 Project Index](#-project-index)
+- [🚀 Getting Started](#-getting-started)
+    - [📋 Prerequisites](#-prerequisites)
+    - [⚙ ️ Installation](#-installation)
+    - [💻 Usage](#-usage)
+    - [🧪 Testing](#-testing)
+- [📈 Roadmap](#-roadmap)
 - [🤝 Contributing](#-contributing)
 - [📜 License](#-license)
 - [✨ Acknowledgments](#-acknowledgments)
@@ -42,22 +42,23 @@
 
 ---
 
-## 🔴 Overview
+## ✨ Overview
 
 
 
 ---
 
-## 🟠 Features
+## 📌 Features
 
 <code>❯ REPLACE-ME</code>
 
 ---
 
-## 🟡 Project Structure
+## 📁 Project Structure
 
 ```sh
 └── pitonzi/
+    ├── README.md
     ├── check_eb_stealth
     │   └── check_eb_stealth.py
     ├── check_system_v2
@@ -74,7 +75,7 @@
         └── testina.py
 ```
 
-### 🟢 Project Index
+### 📑 Project Index
 
 <details open>
 	<summary><b><code>PITONZI/</code></b></summary>
@@ -222,15 +223,15 @@
 
 ---
 
-## 🔵 Getting Started
+## 🚀 Getting Started
 
-### 🟣 Prerequisites
+### 📋 Prerequisites
 
 This project requires the following dependencies:
 
 - **Programming Language:** Python
 
-### ⚫ Installation
+### ⚙️ Installation
 
 Build pitonzi from the source and intsall dependencies:
 
@@ -250,13 +251,13 @@ Build pitonzi from the source and intsall dependencies:
 
 echo 'INSERT-INSTALL-COMMAND-HERE'
 
-### ⚪ Usage
+### 💻 Usage
 
 Run the project with:
 
 echo 'INSERT-RUN-COMMAND-HERE'
 
-### 🟤 Testing
+### 🧪 Testing
 
 Pitonzi uses the {__test_framework__} test framework. Run the test suite with:
 
@@ -264,7 +265,7 @@ echo 'INSERT-TEST-COMMAND-HERE'
 
 ---
 
-## 🌟 Roadmap
+## 📈 Roadmap
 
 - [X] **`Task 1`**: <strike>Implement feature one.</strike>
 - [ ] **`Task 2`**: Implement feature two.
